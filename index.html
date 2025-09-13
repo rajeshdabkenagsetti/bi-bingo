@@ -1,0 +1,1377 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Plan your bingo event with Bowring Institute's Bingo App. Calculate prizes and share results!">
+    <meta name="og:title" content="Bowring Institute Bingo App">
+    <meta name="og:description" content="Easily plan bingo events, calculate prize distributions, and generate reports.">
+    <meta name="og:image" content="https://yourusername.github.io/bingo-app/logo.png">
+    <meta name="og:url" content="https://yourusername.github.io/bingo-app/">
+    <title>Bowring Institute Bingo App</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+    <style>
+        :root {
+            --primary: #007bff;
+            --secondary: #6c757d;
+            --success: #28a745;
+            --danger: #dc3545;
+            --bg: #f9f9f9;
+            --card-bg: #ffffff;
+            --text: #333;
+            --border: #ddd;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --red: #ffcccc;
+            --green: #ccffcc;
+            --neutral: #ffffcc;
+        }
+        [data-theme="dark"] {
+            --primary: #66b0ff;
+            --secondary: #adb5bd;
+            --success: #51cf66;
+            --danger: #ff6b6b;
+            --bg: #1a1a1a;
+            --card-bg: #2c2c2c;
+            --text: #e0e0e0;
+            --border: #444;
+            --shadow: 0 2px 10px rgba(0,0,0,0.3);
+            --red: #5c2d2d;
+            --green: #2d5c2d;
+            --neutral: #5c5c2d;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 1rem;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .app {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 900px;
+        }
+        .logo {
+            max-width: 150px;
+            display: block;
+            margin: 0 auto 1rem;
+        }
+        .app-title {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        .section {
+            margin: 1rem 0;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-bg);
+        }
+        h2, h3 {
+            margin: 0.5rem 0;
+            font-size: 1.4rem;
+        }
+        h3 {
+            font-size: 1.2rem;
+        }
+        label {
+            margin: 0.5rem 0;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        input[type="number"], input[type="file"] {
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            width: 100%;
+            max-width: 100px;
+        }
+        input[type="number"]:invalid {
+            border-color: var(--danger);
+        }
+        .pill-button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 0.3rem;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+        .pill-button:hover {
+            background: color-mix(in srgb, var(--primary) 80%, black);
+        }
+        .pill-button.no {
+            background: var(--secondary);
+        }
+        .pill-button.no:hover {
+            background: color-mix(in srgb, var(--secondary) 80%, black);
+        }
+        .pill-button.toggle {
+            background: var(--success);
+        }
+        .pill-button.toggle:hover {
+            background: color-mix(in srgb, var(--success) 80%, black);
+        }
+        .pill-button.pdf {
+            background: var(--danger);
+        }
+        .pill-button.pdf:hover {
+            background: color-mix(in srgb, var(--danger) 80%, black);
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.5rem;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+        }
+        .grid-item {
+            background: var(--card-bg);
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            text-align: center;
+        }
+        .grid-item input {
+            width: 80px;
+            margin: 0.3rem auto;
+        }
+        .red {
+            background: var(--red) !important;
+            color: red !important;
+        }
+        .green {
+            background: var(--green) !important;
+            color: green !important;
+        }
+        .neutral {
+            background: var(--neutral) !important;
+            color: #666 !important;
+        }
+        #red-flag {
+            color: red;
+            font-weight: bold;
+            font-size: 1rem;
+            text-align: center;
+            display: none;
+            background: var(--red);
+            padding: 0.5rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+        canvas {
+            max-width: 180px;
+            display: block;
+            margin: 1rem auto;
+            border-radius: 50%;
+            box-shadow: var(--shadow);
+        }
+        .config-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+        .ratio-inputs {
+            display: flex;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+        }
+        .ratio-inputs input {
+            width: 50px;
+        }
+        p {
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+        #gst-details, #config-section, #regular-content, #bingo-content, #github-guide {
+            display: none;
+        }
+        .gst-item {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+        .gst-item input[type="checkbox"] {
+            width: auto;
+        }
+        .gst-item input {
+            margin-left: 0.5rem;
+        }
+        .gst-summary {
+            font-weight: bold;
+            margin-top: 0.5rem;
+        }
+        .summary {
+            font-weight: bold;
+            margin: 0.5rem 0;
+            padding: 0.3rem;
+            border-radius: 5px;
+        }
+        .logo-upload-button, .theme-toggle, .share-button, .save-session {
+            position: fixed;
+            top: 1rem;
+            z-index: 1000;
+        }
+        .logo-upload-button {
+            right: 7rem;
+        }
+        .theme-toggle {
+            right: 3.5rem;
+        }
+        .share-button {
+            right: 1rem;
+        }
+        .save-session {
+            right: 10.5rem;
+        }
+        .tooltip {
+            position: relative;
+        }
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            background: var(--text);
+            color: var(--card-bg);
+            padding: 0.3rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 10;
+        }
+        .toast {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--success);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            display: none;
+            z-index: 1000;
+        }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid white;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 0.5rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @media (max-width: 480px) {
+            .app {
+                padding: 0.8rem;
+            }
+            .app-title {
+                font-size: 1.4rem;
+            }
+            h2 {
+                font-size: 1.2rem;
+            }
+            h3 {
+                font-size: 1rem;
+            }
+            input[type="number"] {
+                max-width: 80px;
+            }
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+            .pill-button {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+            .logo-upload-button, .theme-toggle, .share-button, .save-session {
+                top: auto;
+                bottom: 1rem;
+            }
+            .logo-upload-button {
+                right: 7rem;
+            }
+            .theme-toggle {
+                right: 4rem;
+            }
+            .share-button {
+                right: 1rem;
+            }
+            .save-session {
+                right: 10rem;
+            }
+        }
+        @media (min-width: 481px) and (max-width: 768px) {
+            .grid-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .app-title {
+                font-size: 1.6rem;
+            }
+        }
+        @media (prefers-color-scheme: dark) {
+            body:not([data-theme="light"]) {
+                background: var(--bg);
+            }
+            .app, .section, .grid-item {
+                background: var(--card-bg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="pill-button save-session" aria-label="Save session data" data-tooltip="Save session as JSON" onclick="saveSession()">
+        <i class="fas fa-save"></i>
+    </button>
+    <button class="pill-button logo-upload-button" aria-label="Upload logo" data-tooltip="Upload event logo" onclick="document.getElementById('logo-upload').click()">
+        <i class="fas fa-image"></i>
+    </button>
+    <button class="pill-button theme-toggle" aria-label="Toggle dark/light mode" data-tooltip="Toggle dark/light mode" onclick="toggleTheme()">
+        <i class="fas fa-moon"></i>
+    </button>
+    <button class="pill-button share-button" aria-label="Share results" data-tooltip="Share on social media" onclick="shareResults()">
+        <i class="fas fa-share-alt"></i>
+    </button>
+    <div class="toast" id="toast"></div>
+    <div class="app">
+        <input type="file" id="logo-upload" accept="image/*" style="display: none;" aria-label="Upload logo image">
+        <img id="logo" class="logo" src="" alt="Event Logo" style="display: none;">
+        <div class="app-title">Bowring Institute Bingo App</div>
+        
+        <div class="section">
+            <h2><i class="fas fa-bullseye"></i> Step 1: Enter Decided Amount</h2>
+            <div class="config-row">
+                <label for="decided-amount">Decided Amount:</label>
+                <input type="number" id="decided-amount" value="14400" min="0" aria-label="Total decided amount in rupees">
+                <button class="pill-button" onclick="predictBooklet()" aria-label="Calculate suggested booklet price and quantity">
+                    <i class="fas fa-calculator"></i> Calculate
+                </button>
+            </div>
+            <p><strong>Suggested Booklet Price:</strong> <span id="suggested-price">0</span> ₹</p>
+            <p><strong>Suggested Booklets to Sell:</strong> <span id="suggested-booklets">0</span></p>
+        </div>
+
+        <div class="section">
+            <h2><i class="fas fa-money-bill"></i> Step 2: Enter Actual Sales</h2>
+            <div class="config-row">
+                <label for="actual-price">Actual Booklet Price:</label>
+                <input type="number" id="actual-price" value="450" min="0" aria-label="Actual booklet price in rupees">
+                <label for="actual-booklets">Actual Booklets Sold:</label>
+                <input type="number" id="actual-booklets" value="32" min="0" aria-label="Number of booklets sold">
+                <button class="pill-button" onclick="computeActual()" aria-label="Compute prize distribution">
+                    <i class="fas fa-cogs"></i> Compute
+                </button>
+            </div>
+            <p><strong>Total Collected:</strong> <span id="total-collected">0</span> ₹</p>
+            <p><strong>GST Deducted:</strong> <span id="gst-deducted">0</span> ₹</p>
+            <p><strong>Net Distribution:</strong> <span id="actual-distribution">0</span> ₹</p>
+            <p><strong>Per Round (<span id="total-rounds">10</span> rounds):</strong> <span id="per-round">0</span> ₹</p>
+            
+            <button class="pill-button toggle" onclick="toggleSection('gst-details')" aria-label="Toggle GST details section" data-tooltip="View GST settings">
+                <i class="fas fa-file-invoice-dollar"></i> GST Details
+            </button>
+            <div id="gst-details">
+                <h3>GST Applicable Items</h3>
+                <div class="gst-item">
+                    <input type="checkbox" id="gst-entry" checked aria-label="Enable GST for entry fees">
+                    <label for="gst-entry">Entry fees / ticket price</label>
+                    <input type="number" id="gst-entry-rate" value="40" min="0" step="0.1" aria-label="GST rate for entry fees"> %
+                    <label>Amount:</label>
+                    <input type="number" id="gst-entry-amount" value="0" min="0" aria-label="Amount for entry fees GST">
+                    <span>Computed GST: <span id="gst-entry-computed">0</span> ₹</span>
+                </div>
+                <div class="gst-item">
+                    <input type="checkbox" id="gst-commission" checked aria-label="Enable GST for commission">
+                    <label for="gst-commission">Commission / organizer’s fee</label>
+                    <input type="number" id="gst-commission-rate" value="40" min="0" step="0.1" aria-label="GST rate for commission"> %
+                    <label>Amount:</label>
+                    <input type="number" id="gst-commission-amount" value="0" min="0" aria-label="Amount for commission GST">
+                    <span>Computed GST: <span id="gst-commission-computed">0</span> ₹</span>
+                </div>
+                <div class="gst-item">
+                    <input type="checkbox" id="gst-physical" checked aria-label="Enable GST for physical booklets">
+                    <label for="gst-physical">Physical booklets</label>
+                    <input type="number" id="gst-physical-rate" value="18" min="0" step="0.1" aria-label="GST rate for physical booklets"> %
+                    <label>Amount:</label>
+                    <input type="number" id="gst-physical-amount" value="0" min="0" aria-label="Amount for physical booklets GST">
+                    <span>Computed GST: <span id="gst-physical-computed">0</span> ₹</span>
+                </div>
+                <div class="gst-item">
+                    <input type="checkbox" id="gst-boards" checked aria-label="Enable GST for boards">
+                    <label for="gst-boards">Boards / playing sets</label>
+                    <input type="number" id="gst-boards-rate" value="18" min="0" step="0.1" aria-label="GST rate for boards"> %
+                    <label>Amount:</label>
+                    <input type="number" id="gst-boards-amount" value="0" min="0" aria-label="Amount for boards GST">
+                    <span>Computed GST: <span id="gst-boards-computed">0</span> ₹</span>
+                </div>
+                <div class="gst-item">
+                    <input type="checkbox" id="gst-social" aria-label="Enable GST for social game">
+                    <label for="gst-social">Social / recreational game</label>
+                    <input type="number" id="gst-social-rate" value="0" min="0" step="0.1" aria-label="GST rate for social game"> %
+                    <label>Amount:</label>
+                    <input type="number" id="gst-social-amount" value="0" min="0" aria-label="Amount for social game GST">
+                    <span>Computed GST: <span id="gst-social-computed">0</span> ₹</span>
+                </div>
+                <div class="gst-item">
+                    <label for="other-expenses">Other Expenses (fixed):</label>
+                    <input type="number" id="other-expenses" value="0" min="0" aria-label="Other fixed expenses">
+                </div>
+                <p class="gst-summary">Total GST: <span id="total-gst">0</span> ₹</p>
+                <button class="pill-button" onclick="toggleSection('gst-details')" aria-label="Close GST details">Done</button>
+            </div>
+        </div>
+
+        <button class="pill-button toggle" onclick="toggleSection('config-section')" aria-label="Toggle advanced configurations" data-tooltip="View advanced settings">
+            <i class="fas fa-cog"></i> Advanced Configs
+        </button>
+        
+        <div id="config-section" class="section">
+            <h2><i class="fas fa-cog"></i> Advanced Configurations</h2>
+            <div class="config-row">
+                <label for="regular-rounds">Regular Rounds:</label>
+                <input type="number" id="regular-rounds" value="8" min="1" aria-label="Number of regular rounds">
+            </div>
+            <div class="config-row">
+                <label for="bingo-rounds">Bingo Rounds:</label>
+                <input type="number" id="bingo-rounds" value="2" min="1" aria-label="Number of bingo rounds">
+            </div>
+            
+            <h3>Regular Round Config</h3>
+            <div class="config-row">
+                <label for="part-games">Part Games:</label>
+                <input type="number" id="part-games" value="2" min="0" aria-label="Number of part games">
+            </div>
+            <div class="config-row">
+                <label for="sheet-prizes">Sheet Prizes:</label>
+                <input type="number" id="sheet-prizes" value="2" min="0" aria-label="Number of sheet prizes">
+            </div>
+            <div class="config-row">
+                <label for="regular-houses">Houses:</label>
+                <input type="number" id="regular-houses" value="3" min="1" onchange="updateRatios('regular')" aria-label="Number of regular houses">
+            </div>
+            <div class="config-row">
+                <label for="non-house-percent">Non-House %:</label>
+                <input type="number" id="non-house-percent" value="40" min="0" max="100" aria-label="Non-house percentage">
+            </div>
+            <div class="config-row">
+                <label>House Ratios:</label>
+                <div class="ratio-inputs" id="regular-ratios"></div>
+            </div>
+            
+            <h3>Bingo Round Config</h3>
+            <div class="config-row">
+                <label for="bingo-houses">Houses:</label>
+                <input type="number" id="bingo-houses" value="4" min="1" onchange="updateRatios('bingo')" aria-label="Number of bingo houses">
+            </div>
+            <div class="config-row">
+                <label>House Ratios:</label>
+                <div class="ratio-inputs" id="bingo-ratios"></div>
+            </div>
+            <button class="pill-button" onclick="computeActual()" aria-label="Apply configuration changes">
+                <i class="fas fa-check"></i> Apply
+            </button>
+            <button class="pill-button" onclick="toggleSection('config-section')" aria-label="Close advanced configurations">Done</button>
+        </div>
+
+        <div class="section">
+            <h2><i class="fas fa-trophy"></i> Step 3: Prize Distribution</h2>
+            <button class="pill-button toggle" onclick="toggleSection('regular-content')" aria-label="Toggle regular round prizes" data-tooltip="View regular round prizes">
+                <i class="fas fa-trophy"></i> Regular Round Prize Distributions
+            </button>
+            <div id="regular-content">
+                <h3>Regular Round Prizes</h3>
+                <div class="grid-container" id="regular-grid"></div>
+                <p class="summary" id="regular-summary">Round Total Suggested: 0 ₹ | Overridden: 0 ₹ | Gain/Loss: 0 ₹</p>
+                <canvas id="regular-pie" width="180" height="180" role="img" aria-label="Pie chart of regular round prize distribution"></canvas>
+                <button class="pill-button" onclick="toggleSection('regular-content')" aria-label="Close regular round prizes">Done</button>
+            </div>
+            
+            <button class="pill-button toggle" onclick="toggleSection('bingo-content')" aria-label="Toggle bingo round prizes" data-tooltip="View bingo round prizes">
+                <i class="fas fa-trophy"></i> Bingo Round Prize Distributions
+            </button>
+            <div id="bingo-content">
+                <h3>Bingo Round Prizes</h3>
+                <div class="grid-container" id="bingo-grid"></div>
+                <p class="summary" id="bingo-summary">Round Total Suggested: 0 ₹ | Overridden: 0 ₹ | Gain/Loss: 0 ₹</p>
+                <canvas id="bingo-pie" width="180" height="180" role="img" aria-label="Pie chart of bingo round prize distribution"></canvas>
+                <button class="pill-button" onclick="toggleSection('bingo-content')" aria-label="Close bingo round prizes">Done</button>
+            </div>
+
+            <div id="red-flag"><i class="fas fa-exclamation-triangle"></i> RED FLAG: Total disbursement exceeds available amount!</div>
+            <button class="pill-button pdf" onclick="generateReport()" aria-label="Generate HTML report">
+                <i class="fas fa-file-download"></i> Generate Report
+            </button>
+        </div>
+
+        <button class="pill-button toggle" onclick="toggleSection('github-guide')" aria-label="Show GitHub deployment guide" data-tooltip="How to host on GitHub">
+            <i class="fab fa-github"></i> GitHub Guide
+        </button>
+        <div id="github-guide" class="section">
+            <h2><i class="fab fa-github"></i> Deploy to GitHub Pages</h2>
+            <p>Host this app on GitHub Pages for free sharing:</p>
+            <ol>
+                <li>Create a GitHub repository (e.g., <code>bingo-app</code>).</li>
+                <li>Save this file as <code>index.html</code> and upload it to the repo.</li>
+                <li>Go to Settings > Pages, select the <code>main</code> branch, and enable GitHub Pages.</li>
+                <li>Access your app at <code>https://yourusername.github.io/bingo-app/</code>.</li>
+                <li>Share the link on social media! Optionally, add a favicon (save as <code>favicon.png</code>).</li>
+            </ol>
+            <p>For auto-builds, add this to <code>.github/workflows/pages.yml</code>:</p>
+            <pre>
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: ["main"]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+            </pre>
+            <button class="pill-button" onclick="toggleSection('github-guide')" aria-label="Close GitHub guide">Done</button>
+        </div>
+    </div>
+
+    <script>
+        let regularChart = null;
+        let bingoChart = null;
+        let regularPrizes = [];
+        let bingoPrizes = [];
+        let actualDistribution = 0;
+        const password = 'bingo123';
+        let sessionCount = parseInt(localStorage.getItem('sessionCount') || '0') + 1;
+        localStorage.setItem('sessionCount', sessionCount);
+
+        // PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+        }
+
+        // Load saved state
+        function loadState() {
+            const saved = localStorage.getItem('bingoState');
+            if (saved) {
+                try {
+                    const state = JSON.parse(saved);
+                    Object.keys(state).forEach(key => {
+                        const el = document.getElementById(key);
+                        if (el) {
+                            if (el.type === 'checkbox') {
+                                el.checked = state[key];
+                            } else {
+                                el.value = state[key];
+                            }
+                        }
+                    });
+                    if (state.regularRatios) updateRatios('regular', state.regularRatios);
+                    if (state.bingoRatios) updateRatios('bingo', state.bingoRatios);
+                } catch (e) {
+                    showToast('Failed to load saved state.');
+                }
+            }
+            updateGstComputations();
+            predictBooklet();
+            computeActual();
+        }
+
+        // Save state
+        function saveState() {
+            const state = {};
+            document.querySelectorAll('input[type="number"], input[type="checkbox"]').forEach(input => {
+                state[input.id] = input.type === 'checkbox' ? input.checked : input.value;
+            });
+            const regRatios = Array.from(document.querySelectorAll('#regular-ratios input')).map(i => i.value);
+            const binRatios = Array.from(document.querySelectorAll('#bingo-ratios input')).map(i => i.value);
+            state.regularRatios = regRatios;
+            state.bingoRatios = binRatios;
+            localStorage.setItem('bingoState', JSON.stringify(state));
+        }
+
+        // Event listeners
+        document.addEventListener('input', (e) => {
+            if (e.target.type === 'number' && e.target.value < e.target.min) {
+                e.target.value = e.target.min;
+                showToast('Value cannot be negative.');
+            }
+            saveState();
+            updateGstComputations();
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'BUTTON') {
+                e.target.click();
+            }
+        });
+
+        // Logo upload
+        document.getElementById('logo-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    showToast('Logo must be under 2MB.');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('logo').src = e.target.result;
+                    document.getElementById('logo').style.display = 'block';
+                    showToast('Logo uploaded successfully!');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Theme toggle
+        function toggleTheme() {
+            const body = document.body;
+            const isLight = body.getAttribute('data-theme') === 'light';
+            body.setAttribute('data-theme', isLight ? 'dark' : 'light');
+            document.querySelector('.theme-toggle i').className = isLight ? 'fas fa-sun' : 'fas fa-moon';
+            showToast(`Switched to ${isLight ? 'dark' : 'light'} mode.`);
+        }
+
+        // Share results
+        function shareResults() {
+            const url = window.location.href;
+            const text = `Check out my bingo event plan from Bowring Institute Bingo App! Total collected: ${document.getElementById('total-collected').textContent} ₹`;
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Bowring Institute Bingo App',
+                    text,
+                    url
+                }).then(() => showToast('Shared successfully!')).catch(() => showToast('Sharing failed.'));
+            } else {
+                const shareText = encodeURIComponent(text);
+                window.open(`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(url)}`, '_blank');
+                showToast('Opened sharing options.');
+            }
+            confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+        }
+
+        // Save session
+        function saveSession() {
+            const state = localStorage.getItem('bingoState');
+            const blob = new Blob([state], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'bingo-session.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Session saved as JSON.');
+            confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+
+        // Toggle section
+        function toggleSection(id) {
+            const section = document.getElementById(id);
+            const entered = prompt('Enter password to toggle:');
+            if (entered === password) {
+                section.style.display = section.style.display === 'none' ? 'block' : 'none';
+                showToast(`${id.replace('-', ' ').replace(/(^\w|\s\w)/g, c => c.toUpperCase())} section toggled.`);
+            } else {
+                showToast('Incorrect password.');
+            }
+        }
+
+        function predictBooklet() {
+            const button = document.querySelector('#decided-amount + button');
+            button.classList.add('loading');
+            setTimeout(() => {
+                const A = parseFloat(document.getElementById('decided-amount').value) || 0;
+                if (A < 0) {
+                    showToast('Decided amount cannot be negative.');
+                    return;
+                }
+                const price = Math.round(0.00536 * A + 373);
+                const booklets = (A / price).toFixed(3);
+                document.getElementById('suggested-price').textContent = price;
+                document.getElementById('suggested-booklets').textContent = booklets;
+                showToast('Suggestions calculated!');
+                confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+                button.classList.remove('loading');
+            }, 500);
+        }
+
+        function computeActual() {
+            const button = document.querySelector('#actual-booklets + button');
+            button.classList.add('loading');
+            setTimeout(() => {
+                const price = parseFloat(document.getElementById('actual-price').value) || 0;
+                const booklets = parseFloat(document.getElementById('actual-booklets').value) || 0;
+                if (price < 0 || booklets < 0) {
+                    showToast('Price and booklets cannot be negative.');
+                    return;
+                }
+                const totalCollected = Math.round(price * booklets);
+                const gstTotal = parseFloat(document.getElementById('total-gst').textContent) || 0;
+                const expenses = parseFloat(document.getElementById('other-expenses').value) || 0;
+                actualDistribution = totalCollected - gstTotal - expenses;
+                const regularRounds = parseInt(document.getElementById('regular-rounds').value) || 8;
+                const bingoRounds = parseInt(document.getElementById('bingo-rounds').value) || 2;
+                const totalRounds = regularRounds + bingoRounds;
+                const perRound = Math.round(actualDistribution / totalRounds);
+                
+                document.getElementById('total-collected').textContent = totalCollected;
+                document.getElementById('gst-deducted').textContent = gstTotal;
+                document.getElementById('actual-distribution').textContent = actualDistribution;
+                document.getElementById('total-rounds').textContent = totalRounds;
+                document.getElementById('per-round').textContent = perRound;
+                
+                populateSuggestions(perRound, regularRounds, bingoRounds);
+                showToast('Distribution computed!');
+                confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+                button.classList.remove('loading');
+            }, 500);
+        }
+
+        function updateGstComputations() {
+            let totalGst = 0;
+            ['entry', 'commission', 'physical', 'boards', 'social'].forEach(item => {
+                const checkbox = document.getElementById(`gst-${item}`);
+                if (checkbox.checked) {
+                    const rate = parseFloat(document.getElementById(`gst-${item}-rate`).value) || 0;
+                    const amount = parseFloat(document.getElementById(`gst-${item}-amount`).value) || 0;
+                    if (rate < 0 || amount < 0) {
+                        showToast('GST rate and amount cannot be negative.');
+                        return;
+                    }
+                    const computed = Math.round((rate / 100) * amount);
+                    document.getElementById(`gst-${item}-computed`).textContent = computed;
+                    totalGst += computed;
+                } else {
+                    document.getElementById(`gst-${item}-computed`).textContent = 0;
+                }
+            });
+            document.getElementById('total-gst').textContent = totalGst;
+            document.getElementById('gst-deducted').textContent = totalGst;
+            computeActual();
+        }
+
+        function generateRatios(n) {
+            if (n === 1) return [100];
+            if (n === 2) return [60, 40];
+            if (n === 3) return [50, 30, 20];
+            if (n === 4) return [40, 30, 20, 10];
+            let ratios = [];
+            let start = 40 + 5 * (5 - n);
+            if (start < 30) start = 30;
+            for (let i = 0; i < n; i++) {
+                ratios.push(Math.max(5, start - 10 * i));
+            }
+            let sum = ratios.reduce((a, b) => a + b, 0);
+            ratios = ratios.map(r => Math.round(r / sum * 100));
+            let finalSum = ratios.reduce((a, b) => a + b, 0);
+            if (finalSum > 100) ratios[ratios.length - 1] -= finalSum - 100;
+            else if (finalSum < 100) ratios[ratios.length - 1] += 100 - finalSum;
+            return ratios;
+        }
+
+        function updateRatios(type, predefined = null) {
+            const houses = parseInt(document.getElementById(`${type}-houses`).value) || (type === 'regular' ? 3 : 4);
+            if (houses < 1) {
+                showToast('Houses cannot be less than 1.');
+                document.getElementById(`${type}-houses`).value = 1;
+                return;
+            }
+            const ratiosDiv = document.getElementById(`${type}-ratios`);
+            ratiosDiv.innerHTML = '';
+            const ratios = predefined || generateRatios(houses);
+            for (let i = 0; i < houses; i++) {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.value = ratios[i] || 0;
+                input.min = '0';
+                input.setAttribute('aria-label', `Ratio for ${type} house ${i + 1}`);
+                input.onchange = () => {
+                    if (input.value < 0) {
+                        input.value = 0;
+                        showToast('Ratio cannot be negative.');
+                    }
+                    saveState();
+                };
+                ratiosDiv.appendChild(input);
+            }
+        }
+
+        function populateSuggestions(perRound, regularRounds, bingoRounds) {
+            if (regularRounds < 1 || bingoRounds < 1) {
+                showToast('Rounds cannot be less than 1.');
+                return;
+            }
+            const nonHousePercent = parseFloat(document.getElementById('non-house-percent').value) || 40;
+            if (nonHousePercent < 0 || nonHousePercent > 100) {
+                showToast('Non-house percentage must be between 0 and 100.');
+                return;
+            }
+            const nonHouseTotal = Math.round((nonHousePercent / 100) * perRound);
+            const partGames = parseInt(document.getElementById('part-games').value) || 2;
+            const sheetPrizes = parseInt(document.getElementById('sheet-prizes').value) || 2;
+            const numNonHouse = partGames + sheetPrizes;
+            const eachNonHouse = numNonHouse > 0 ? Math.round(nonHouseTotal / numNonHouse) : 0;
+            const houseTotal = perRound - nonHouseTotal;
+            const regRatios = Array.from(document.querySelectorAll('#regular-ratios input')).map(i => parseInt(i.value) || 0);
+            const houseRatiosSum = regRatios.reduce((a, b) => a + b, 0) || 100;
+            const regularHouses = parseInt(document.getElementById('regular-houses').value) || 3;
+            
+            regularPrizes = [];
+            for (let i = 1; i <= partGames; i++) {
+                regularPrizes.push({ name: `Part Game ${i}`, suggested: eachNonHouse, overridden: null, readOnly: true });
+            }
+            for (let i = 1; i <= sheetPrizes; i++) {
+                regularPrizes.push({ name: `Sheet Prize ${i}`, suggested: eachNonHouse, overridden: null, readOnly: true });
+            }
+            for (let i = 1; i <= regularHouses; i++) {
+                const ratio = regRatios[i - 1] || 0;
+                const suggested = Math.round((ratio / houseRatiosSum) * houseTotal);
+                regularPrizes.push({ name: `House ${i}`, suggested, overridden: null, readOnly: true });
+            }
+            renderGrid('regular-grid', regularPrizes, 'regular');
+
+            const bingoHouses = parseInt(document.getElementById('bingo-houses').value) || 4;
+            const binRatios = Array.from(document.querySelectorAll('#bingo-ratios input')).map(i => parseInt(i.value) || 0);
+            const bingoRatiosSum = binRatios.reduce((a, b) => a + b, 0) || 100;
+            bingoPrizes = [];
+            for (let i = 1; i <= bingoHouses; i++) {
+                const ratio = binRatios[i - 1] || 0;
+                const suggested = Math.round((ratio / bingoRatiosSum) * perRound);
+                bingoPrizes.push({ name: `House ${i}`, suggested, overridden: null, readOnly: true });
+            }
+            renderGrid('bingo-grid', bingoPrizes, 'bingo');
+
+            updateCharts(perRound);
+            checkTotalDisbursement(regularRounds, bingoRounds);
+        }
+
+        function renderGrid(gridId, prizes, type) {
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = '';
+            prizes.forEach((p, index) => {
+                const overriddenVal = p.overridden !== null ? p.overridden : '';
+                const diff = p.overridden !== null ? p.suggested - p.overridden : 0;
+                const diffClass = p.overridden !== null ? getDiffClass(p.suggested, p.overridden) : '';
+                const item = document.createElement('div');
+                item.className = 'grid-item';
+                item.innerHTML = `
+                    <p><strong>${p.name}</strong></p>
+                    <p>Suggested: ${p.suggested} ₹</p>
+                    <p>Overridden: <input type="number" value="${overriddenVal}" ${p.readOnly ? 'readonly' : ''} onchange="updateOverride('${gridId}', ${index}, this.value)" aria-label="Override ${p.name} amount"></p>
+                    <p class="${diffClass}">Diff: ${diff} ₹</p>
+                    <div>
+                        <button class="pill-button" onclick="acceptThis('${gridId}', ${index})" aria-label="Accept suggested amount for ${p.name}"><i class="fas fa-check"></i> Yes</button>
+                        <button class="pill-button no" onclick="noThis('${gridId}', ${index})" aria-label="Enter custom amount for ${p.name}"><i class="fas fa-edit"></i> No</button>
+                    </div>
+                `;
+                grid.appendChild(item);
+            });
+            updateRoundSummary(type);
+        }
+
+        function updateOverride(gridId, index, value) {
+            const val = parseFloat(value) || 0;
+            if (val < 0) {
+                showToast('Override amount cannot be negative.');
+                return;
+            }
+            const prizes = gridId === 'regular-grid' ? regularPrizes : bingoPrizes;
+            prizes[index].overridden = val;
+            renderGrid(gridId, prizes, gridId === 'regular-grid' ? 'regular' : 'bingo');
+            checkTotalDisbursement(
+                parseInt(document.getElementById('regular-rounds').value) || 8,
+                parseInt(document.getElementById('bingo-rounds').value) || 2
+            );
+            showToast('Prize overridden.');
+        }
+
+        function acceptThis(gridId, index) {
+            const prizes = gridId === 'regular-grid' ? regularPrizes : bingoPrizes;
+            prizes[index].overridden = prizes[index].suggested;
+            prizes[index].readOnly = true;
+            renderGrid(gridId, prizes, gridId === 'regular-grid' ? 'regular' : 'bingo');
+            checkTotalDisbursement(
+                parseInt(document.getElementById('regular-rounds').value) || 8,
+                parseInt(document.getElementById('bingo-rounds').value) || 2
+            );
+            showToast('Suggested amount accepted.');
+            confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+        }
+
+        function noThis(gridId, index) {
+            const newValue = prompt('Enter custom amount:');
+            if (newValue !== null) {
+                const val = parseFloat(newValue) || 0;
+                if (val < 0) {
+                    showToast('Custom amount cannot be negative.');
+                    return;
+                }
+                const prizes = gridId === 'regular-grid' ? regularPrizes : bingoPrizes;
+                prizes[index].overridden = val;
+                prizes[index].readOnly = false;
+                renderGrid(gridId, prizes, gridId === 'regular-grid' ? 'regular' : 'bingo');
+                checkTotalDisbursement(
+                    parseInt(document.getElementById('regular-rounds').value) || 8,
+                    parseInt(document.getElementById('bingo-rounds').value) || 2
+                );
+                showToast('Custom amount set.');
+            }
+        }
+
+        function getDiffClass(suggested, overridden) {
+            const diff = suggested - overridden;
+            if (diff < 0) return 'red';
+            if (diff > 0) return 'green';
+            return 'neutral';
+        }
+
+        function updateRoundSummary(type) {
+            const prizes = type === 'regular' ? regularPrizes : bingoPrizes;
+            const totalSuggested = prizes.reduce((sum, p) => sum + p.suggested, 0);
+            const totalOverridden = prizes.reduce((sum, p) => sum + (p.overridden !== null ? p.overridden : p.suggested), 0);
+            const diff = totalSuggested - totalOverridden;
+            const summaryEl = document.getElementById(`${type}-summary`);
+            summaryEl.textContent = `Round Total Suggested: ${totalSuggested} ₹ | Overridden: ${totalOverridden} ₹ | Gain/Loss: ${diff} ₹`;
+            summaryEl.className = `summary ${diff < 0 ? 'red' : diff > 0 ? 'green' : 'neutral'}`;
+        }
+
+        function checkTotalDisbursement(regularRounds, bingoRounds) {
+            const totalRegular = regularPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.overridden : p.suggested), 0) * regularRounds;
+            const totalBingo = bingoPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.overridden : p.suggested), 0) * bingoRounds;
+            const totalDisbursed = totalRegular + totalBingo;
+            const flag = document.getElementById('red-flag');
+            flag.style.display = totalDisbursed > actualDistribution ? 'block' : 'none';
+            if (totalDisbursed > actualDistribution) {
+                showToast('Warning: Total disbursement exceeds available amount.');
+            }
+        }
+
+        function updateCharts(perRound) {
+            const nonHousePercent = parseFloat(document.getElementById('non-house-percent').value) || 40;
+            const nonHouseTotal = Math.round((nonHousePercent / 100) * perRound);
+            const houseTotal = perRound - nonHouseTotal;
+
+            if (regularChart) regularChart.destroy();
+            const regularCtx = document.getElementById('regular-pie').getContext('2d');
+            regularChart = new Chart(regularCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Non-House', 'Houses'],
+                    datasets: [{
+                        data: [nonHouseTotal, houseTotal],
+                        backgroundColor: ['#FF6384', '#36A2EB']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { enabled: true },
+                        title: { display: true, text: 'Regular Round Distribution' }
+                    }
+                }
+            });
+
+            if (bingoChart) bingoChart.destroy();
+            const bingoCtx = document.getElementById('bingo-pie').getContext('2d');
+            const bingoData = bingoPrizes.map(p => p.overridden !== null ? p.overridden : p.suggested);
+            bingoChart = new Chart(bingoCtx, {
+                type: 'pie',
+                data: {
+                    labels: bingoPrizes.map(p => p.name),
+                    datasets: [{
+                        data: bingoData,
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { enabled: true },
+                        title: { display: true, text: 'Bingo Round Distribution' }
+                    }
+                }
+            });
+        }
+
+        function generateReport() {
+            const button = document.querySelector('.pill-button.pdf');
+            button.classList.add('loading');
+            setTimeout(() => {
+                const decidedAmount = document.getElementById('decided-amount').value || '0';
+                const suggestedPrice = document.getElementById('suggested-price').textContent || '0';
+                const suggestedBooklets = document.getElementById('suggested-booklets').textContent || '0';
+                const actualPrice = document.getElementById('actual-price').value || '0';
+                const actualBooklets = document.getElementById('actual-booklets').value || '0';
+                const totalCollected = document.getElementById('total-collected').textContent || '0';
+                const gstDeducted = document.getElementById('gst-deducted').textContent || '0';
+                const actualDistribution = document.getElementById('actual-distribution').textContent || '0';
+                const totalRounds = document.getElementById('total-rounds').textContent || '10';
+                const perRound = document.getElementById('per-round').textContent || '0';
+                const regularRounds = document.getElementById('regular-rounds').value || '8';
+                const bingoRounds = document.getElementById('bingo-rounds').value || '2';
+                const partGames = document.getElementById('part-games').value || '2';
+                const sheetPrizes = document.getElementById('sheet-prizes').value || '2';
+                const regularHouses = document.getElementById('regular-houses').value || '3';
+                const nonHousePercent = document.getElementById('non-house-percent').value || '40';
+                const bingoHouses = document.getElementById('bingo-houses').value || '4';
+                const regularRatios = Array.from(document.querySelectorAll('#regular-ratios input')).map(i => i.value || '0');
+                const bingoRatios = Array.from(document.querySelectorAll('#bingo-ratios input')).map(i => i.value || '0');
+                const gstItems = ['entry', 'commission', 'physical', 'boards', 'social'].map(item => ({
+                    name: document.querySelector(`#gst-${item}`).parentElement.querySelector('label').textContent,
+                    checked: document.getElementById(`gst-${item}`).checked,
+                    rate: document.getElementById(`gst-${item}-rate`).value || '0',
+                    amount: document.getElementById(`gst-${item}-amount`).value || '0',
+                    computed: document.getElementById(`gst-${item}-computed`).textContent || '0'
+                }));
+                const totalGst = document.getElementById('total-gst').textContent || '0';
+                const otherExpenses = document.getElementById('other-expenses').value || '0';
+                const logoSrc = document.getElementById('logo').src || '';
+
+                const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bowring Institute Bingo Report</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --bg: #f9f9f9;
+            --card-bg: #ffffff;
+            --text: #333;
+            --border: #ddd;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --red: #ffcccc;
+            --green: #ccffcc;
+            --neutral: #ffffcc;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 1rem;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .report {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .logo {
+            max-width: 150px;
+            display: block;
+            margin: 0 auto 1rem;
+        }
+        .report-title {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        .report-date {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        h2 {
+            color: var(--text);
+            margin: 1rem 0 0.5rem;
+            font-size: 1.4rem;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 0.3rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5rem 0;
+            background: var(--card-bg);
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        th {
+            background: var(--primary);
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .red {
+            background: var(--red);
+            color: red;
+        }
+        .green {
+            background: var(--green);
+            color: green;
+        }
+        .neutral {
+            background: var(--neutral);
+            color: #666;
+        }
+        .total-row {
+            font-weight: bold;
+            background: #e9ecef;
+        }
+        @media (max-width: 480px) {
+            .report {
+                padding: 0.8rem;
+            }
+            .report-title {
+                font-size: 1.4rem;
+            }
+            h2 {
+                font-size: 1.2rem;
+            }
+            th, td {
+                font-size: 0.8rem;
+                padding: 0.4rem;
+            }
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .report {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report">
+        ${logoSrc ? `<img src="${logoSrc}" class="logo" alt="Event Logo">` : ''}
+        <div class="report-title">Bowring Institute Bingo App Report</div>
+        <div class="report-date">Generated on ${new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' })}</div>
+        
+        <h2>Step 1: Decided Amount</h2>
+        <table>
+            <tr><th>Description</th><th>Value</th></tr>
+            <tr><td>Decided Amount</td><td>${decidedAmount} ₹</td></tr>
+            <tr><td>Suggested Booklet Price</td><td>${suggestedPrice} ₹</td></tr>
+            <tr><td>Suggested Booklets to Sell</td><td>${suggestedBooklets}</td></tr>
+        </table>
+
+        <h2>Step 2: Actual Sales</h2>
+        <table>
+            <tr><th>Description</th><th>Value</th></tr>
+            <tr><td>Actual Booklet Price</td><td>${actualPrice} ₹</td></tr>
+            <tr><td>Actual Booklets Sold</td><td>${actualBooklets}</td></tr>
+            <tr><td>Total Collected</td><td>${totalCollected} ₹</td></tr>
+            <tr><td>GST Deducted</td><td>${gstDeducted} ₹</td></tr>
+            <tr><td>Net Distribution</td><td>${actualDistribution} ₹</td></tr>
+            <tr><td>Total Rounds</td><td>${totalRounds}</td></tr>
+            <tr><td>Per Round</td><td>${perRound} ₹</td></tr>
+        </table>
+
+        <h2>GST Details</h2>
+        <table>
+            <tr><th>Item</th><th>Applicable</th><th>Rate</th><th>Amount</th><th>Computed GST</th></tr>
+            ${gstItems.map(item => `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.checked ? 'Yes' : 'No'}</td>
+                    <td>${item.rate}%</td>
+                    <td>${item.amount} ₹</td>
+                    <td>${item.computed} ₹</td>
+                </tr>
+            `).join('')}
+            <tr>
+                <td>Other Expenses</td>
+                <td>--</td>
+                <td>--</td>
+                <td>${otherExpenses} ₹</td>
+                <td>--</td>
+            </tr>
+            <tr class="total-row">
+                <td>Total GST</td>
+                <td colspan="4">${totalGst} ₹</td>
+            </tr>
+        </table>
+
+        <h2>Advanced Configurations</h2>
+        <table>
+            <tr><th>Description</th><th>Value</th></tr>
+            <tr><td>Regular Rounds</td><td>${regularRounds}</td></tr>
+            <tr><td>Bingo Rounds</td><td>${bingoRounds}</td></tr>
+            <tr><td>Part Games</td><td>${partGames}</td></tr>
+            <tr><td>Sheet Prizes</td><td>${sheetPrizes}</td></tr>
+            <tr><td>Regular Houses</td><td>${regularHouses}</td></tr>
+            <tr><td>Non-House Percentage</td><td>${nonHousePercent}%</td></tr>
+            <tr><td>Regular House Ratios</td><td>${regularRatios.join(':')}</td></tr>
+            <tr><td>Bingo Houses</td><td>${bingoHouses}</td></tr>
+            <tr><td>Bingo House Ratios</td><td>${bingoRatios.join(':')}</td></tr>
+        </table>
+
+        <h2>Regular Round Prizes</h2>
+        <table>
+            <tr><th>Prize</th><th>Suggested (₹)</th><th>Overridden (₹)</th><th>Difference (₹)</th><th>Status</th></tr>
+            ${regularPrizes.map(p => `
+                <tr>
+                    <td>${p.name}</td>
+                    <td>${p.suggested}</td>
+                    <td>${p.overridden !== null ? p.overridden : '-'}</td>
+                    <td>${p.overridden !== null ? p.suggested - p.overridden : '-'}</td>
+                    <td class="${p.overridden !== null ? (p.suggested - p.overridden < 0 ? 'red' : p.suggested - p.overridden > 0 ? 'green' : 'neutral') : ''}">
+                        ${p.overridden !== null ? (p.suggested - p.overridden < 0 ? 'Loss' : p.suggested - p.overridden > 0 ? 'Gain' : 'Neutral') : '-'}
+                    </td>
+                </tr>
+            `).join('')}
+            <tr class="total-row">
+                <td>Total</td>
+                <td>${regularPrizes.reduce((sum, p) => sum + p.suggested, 0)}</td>
+                <td>${regularPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.overridden : p.suggested), 0)}</td>
+                <td>${regularPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.suggested - p.overridden : 0), 0)}</td>
+                <td class="${regularPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.suggested - p.overridden : 0), 0) < 0 ? 'red' : regularPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.suggested - p.overridden : 0), 0) > 0 ? 'green' : 'neutral'}"></td>
+            </tr>
+        </table>
+
+        <h2>Bingo Round Prizes</h2>
+        <table>
+            <tr><th>Prize</th><th>Suggested (₹)</th><th>Overridden (₹)</th><th>Difference (₹)</th><th>Status</th></tr>
+            ${bingoPrizes.map(p => `
+                <tr>
+                    <td>${p.name}</td>
+                    <td>${p.suggested}</td>
+                    <td>${p.overridden !== null ? p.overridden : '-'}</td>
+                    <td>${p.overridden !== null ? p.suggested - p.overridden : '-'}</td>
+                    <td class="${p.overridden !== null ? (p.suggested - p.overridden < 0 ? 'red' : p.suggested - p.overridden > 0 ? 'green' : 'neutral') : ''}">
+                        ${p.overridden !== null ? (p.suggested - p.overridden < 0 ? 'Loss' : p.suggested - p.overridden > 0 ? 'Gain' : 'Neutral') : '-'}
+                    </td>
+                </tr>
+            `).join('')}
+            <tr class="total-row">
+                <td>Total</td>
+                <td>${bingoPrizes.reduce((sum, p) => sum + p.suggested, 0)}</td>
+                <td>${bingoPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.overridden : p.suggested), 0)}</td>
+                <td>${bingoPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.suggested - p.overridden : 0), 0)}</td>
+                <td class="${bingoPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.suggested - p.overridden : 0), 0) < 0 ? 'red' : bingoPrizes.reduce((sum, p) => sum + (p.overridden !== null ? p.suggested - p.overridden : 0), 0) > 0 ? 'green' : 'neutral'}"></td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
+                `;
+
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'bingo-report.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Report downloaded!');
+                confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+                button.classList.remove('loading');
+            }, 500);
+        }
+
+        // Initialize
+        window.onload = () => {
+            updateRatios('regular');
+            updateRatios('bingo');
+            loadState();
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.body.setAttribute('data-theme', 'dark');
+                document.querySelector('.theme-toggle i').className = 'fas fa-sun';
+            }
+        };
+    </script>
+</body>
+</html>
